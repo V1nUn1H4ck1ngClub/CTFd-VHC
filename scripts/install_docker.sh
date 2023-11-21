@@ -5,7 +5,7 @@
 
 # Install packages to allow apt to use a repository over HTTPS
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    python-pip \
+    python3-pip \
     apt-transport-https \
     ca-certificates \
     curl \
