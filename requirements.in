@@ -1,11 +1,11 @@
 Flask==2.0.3
 Werkzeug==2.0.3
-Flask-SQLAlchemy==2.5.1
+Flask-SQLAlchemy
 Flask-Caching==2.0.2
 Flask-Migrate==2.5.3
 Flask-Script==2.0.6
-SQLAlchemy==1.4.48
-SQLAlchemy-Utils==0.41.1
+SQLAlchemy
+SQLAlchemy-Utils
 passlib==1.7.4
 bcrypt==4.0.1
 requests==2.28.1
