@@ -50,7 +50,7 @@ function get_docker_status(container,challenge_id) {
                     port = String(port)
                     data = data + 'Host: ' + item.host + ' Port: ' + port + '<br />';
                 })
-                $('#docker_container').html('<pre>Docker Container Information:<br />' + data + '<div class="mt-2" id="' + String(item.instance_id).substring(0,10) + '_revert_container"></div>');
+                $('#docker_container').html('<pre style="color:white">Docker Container Information:<br />' + data + '<div class="mt-2" id="' + String(item.instance_id).substring(0,10) + '_revert_container"></div>');
                 var countDownDate = new Date(parseInt(item.revert_time) * 1000).getTime();
                 var x = setInterval(function() {
                     var now = new Date().getTime();
