@@ -22,16 +22,5 @@ CTFd.plugin.run((_CTFd) => {
             }
         });
     });
-    $.getJSON("/api/v1/secret", function(result){
-        $.each(result['data'], function(i, item){
-            if (item.name == 'Error in Docker Config!') { 
-                document.docker_form.dockersecrets_select.disabled = true;
-                $("label[for='DockerSecrets']").text('Docker Secret ' + item.name)
-            }
-            else {
-                $("#dockersecrets_select").append($("<option />").val(item.id).text(item.name));
-            }
-        });
-    });
 });
 });

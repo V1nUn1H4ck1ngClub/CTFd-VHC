@@ -13,9 +13,8 @@ from CTFd.utils.user import get_current_team, get_current_user
 from ..functions.containers import create_container, delete_container
 from ..functions.general import (get_repositories, get_secrets,
                                  get_unavailable_ports)
-from ..functions.services import create_service, delete_service
 from ..models.models import (DockerChallenge, DockerChallengeTracker,
-                             DockerConfig, DockerServiceChallenge)
+                             DockerConfig, DockerDynamicChallenge)
 
 active_docker_namespace = Namespace("docker_status", description='Endpoint to retrieve User Docker Image Status')
 container_namespace = Namespace("container", description='Endpoint to interact with containers')
@@ -25,11 +24,7 @@ kill_container = Namespace("nuke", description='Endpoint to nuke containers')
 
 
 def delete_docker(docker, type, id):
-    if type == "docker_service":
-        assert (delete_service(docker, id))
-
-    else:
-        assert (delete_container(docker, id))
+    assert (delete_container(docker, id))
     DockerChallengeTracker.query.filter_by(instance_id=id).delete()
     db.session.commit()
 
@@ -43,7 +38,7 @@ class KillContainerAPI(Resource):
         docker_config = DockerConfig.query.filter_by(id=1).first_or_404()
         docker_tracker = DockerChallengeTracker.query.all()
         challenges = {c.id: c for c in DockerChallenge.query.all()}
-        challenges.update({c.id: c for c in DockerServiceChallenge.query.all()})
+        challenges.update({c.id: c for c in DockerDynamicChallenge.query.all()})
 
         if full == "true":
             for c in docker_tracker:
@@ -84,7 +79,7 @@ class ContainerAPI(Resource):
         containers = DockerChallengeTracker.query.all()
         challenge = DockerChallenge.query.filter_by(id=challenge_id).first()
         if not challenge:
-            challenge = DockerServiceChallenge.query.filter_by(id=challenge_id).first()
+            challenge = DockerDynamicChallenge.query.filter_by(id=challenge_id).first()
         if not challenge:
             return abort(403)
         if is_teams_mode():
@@ -117,15 +112,9 @@ class ContainerAPI(Resource):
                     docker_image=challenge.docker_image).filter_by(challenge_id=challenge.id).delete()
             db.session.commit()
         portsbl = get_unavailable_ports(docker)
-        if challenge.docker_type == 'service':
-            instance_id, data = create_service(docker, challenge_id=challenge.id, image=challenge.docker_image,
-                                               team=session.name, portbl=portsbl)
-            ports_json = json.loads(data)['EndpointSpec']['Ports']
-            ports = [f"{p['PublishedPort']}/{p['Protocol']}" for p in ports_json]
-        else:
-            instance_id, data = create_container(docker, challenge.docker_image, session.name, portsbl)
-            ports_json = json.loads(data)['HostConfig']['PortBindings'].values()
-            ports = [f"{i['HostPort']}" for p in ports_json for i in p]
+        instance_id, data = create_container(docker, challenge.docker_image, session.name, portsbl)
+        ports_json = json.loads(data)['HostConfig']['PortBindings'].values()
+        ports = [f"{i['HostPort']}" for p in ports_json for i in p]
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,
             user_id=session.id if not is_teams_mode() else None,

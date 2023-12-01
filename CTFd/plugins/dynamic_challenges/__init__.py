@@ -112,7 +112,6 @@ class DynamicValueChallenge(BaseChallenge):
     @classmethod
     def solve(cls, user, team, challenge, request):
         super().solve(user, team, challenge, request)
-
         DynamicValueChallenge.calculate_value(challenge)
 
 

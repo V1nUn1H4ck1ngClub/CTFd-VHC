@@ -5,51 +5,79 @@ from CTFd.plugins.flags import get_flag_class
 from CTFd.utils.config import is_teams_mode
 from CTFd.utils.uploads import delete_file
 from CTFd.utils.user import get_ip
+from CTFd.plugins.dynamic_challenges.decay import DECAY_FUNCTIONS, logarithmic
+
 from flask import Blueprint
 
-from ..functions.services import delete_service
-from ..models.models import (DockerChallengeTracker, DockerConfig,
-                             DockerServiceChallenge)
+from ..functions.containers import delete_container
+from ..models.models import (DockerChallengeTracker, DockerConfig, DockerDynamicChallenge)
 
 
-class DockerServiceChallengeType(BaseChallenge):
-    id = "docker_service"
-    name = "docker_service"
+
+class DockerDynamicChallengeType(BaseChallenge):
+    id = "docker_dynamic"
+    name = "docker_dynamic"
     templates = {
-        'create': '/plugins/docker_challenges/assets/create_service.html',
-        'update': '/plugins/docker_challenges/assets/update_service.html',
-        'view': '/plugins/docker_challenges/assets/view.html',
+        "create": "/plugins/docker_challenges/assets/create_dynamic.html",
+        "update": "/plugins/docker_challenges/assets/update_dynamic.html",
+        "view": "/plugins/docker_challenges/assets/view_dynamic.html",
     }
     scripts = {
-        'create': '/plugins/docker_challenges/assets/create_service.js',
-        'update': '/plugins/docker_challenges/assets/update_service.js',
-        'view': '/plugins/docker_challenges/assets/view.js',
+        "create": "/plugins/docker_challenges/assets/create_dynamic.js",
+        "update": "/plugins/docker_challenges/assets/update_dynamic.js",
+        "view": "/plugins/docker_challenges/assets/view_dynamic.js",
     }
-    route = '/plugins/docker_challenges/assets'
-    blueprint = Blueprint('docker_service_challenges', __name__, template_folder='templates', static_folder='assets')
+    route = "/plugins/docker_challenges/assets"
+    blueprint = Blueprint("docker_dynamic_challenges", 
+                          __name__, 
+                          template_folder="templates",
+                          static_folder="assets")
+    
+    challenge_model = DockerDynamicChallenge
 
-    @staticmethod
-    def update(challenge, request):
-        """
-		This method is used to update the information associated with a challenge. This should be kept strictly to the
-		Challenges table and any child tables.
+    @classmethod
+    def calculate_value(cls, challenge):
+        f = DECAY_FUNCTIONS.get(challenge.function, logarithmic)
+        value = f(challenge)
 
-		:param challenge:
-		:param request:
-		:return:
-		"""
-        data = request.form or request.get_json()
-        data['docker_secrets'] = data['docker_secrets_array']
-        data['docker_type'] = 'service'
-        del data['docker_secrets_array']
-        for attr, value in data.items():
-            setattr(challenge, attr, value)
-
+        challenge.value = value
         db.session.commit()
         return challenge
+    
+    @classmethod
+    def read(cls, challenge):
+        """
+        This method is in used to access the data of a challenge in a format processable by the front end.
 
-    @staticmethod
-    def delete(challenge):
+        :param challenge:
+        :return: Challenge object, data dictionary to be returned to the user
+        """
+        challenge = DockerDynamicChallenge.query.filter_by(id=challenge.id).first()
+    
+        data = {
+            'id': challenge.id,
+            'name': challenge.name,
+            'value': challenge.value,
+            "initial": challenge.initial,
+            "decay": challenge.decay,
+            "minimum": challenge.minimum,
+            'docker_image': challenge.docker_image,
+            'description': challenge.description,
+            'category': challenge.category,
+            'state': challenge.state,
+            'max_attempts': challenge.max_attempts,
+            'type': challenge.type,
+            'type_data': {
+                'id': cls.id,
+                'name': cls.name,
+                'templates': cls.templates,
+                'scripts': cls.scripts,
+            }
+        }
+        return data 
+    
+    @classmethod
+    def delete(cls, challenge):
         """
 		This method is used to delete the resources used by a challenge.
 		NOTE: Will need to kill all containers here
@@ -66,41 +94,12 @@ class DockerServiceChallengeType(BaseChallenge):
         ChallengeFiles.query.filter_by(challenge_id=challenge.id).delete()
         Tags.query.filter_by(challenge_id=challenge.id).delete()
         Hints.query.filter_by(challenge_id=challenge.id).delete()
-        DockerServiceChallenge.query.filter_by(id=challenge.id).delete()
+        DockerDynamicChallenge.query.filter_by(id=challenge.id).delete()
         Challenges.query.filter_by(id=challenge.id).delete()
         db.session.commit()
 
-    @staticmethod
-    def read(challenge):
-        """
-		This method is in used to access the data of a challenge in a format processable by the front end.
-
-		:param challenge:
-		:return: Challenge object, data dictionary to be returned to the user
-		"""
-        challenge = DockerServiceChallenge.query.filter_by(id=challenge.id).first()
-        data = {
-            'id': challenge.id,
-            'name': challenge.name,
-            'value': challenge.value,
-            'docker_image': challenge.docker_image,
-            'description': challenge.description,
-            'category': challenge.category,
-            'secrets': challenge.docker_secrets.split(','),
-            'state': challenge.state,
-            'max_attempts': challenge.max_attempts,
-            'type': challenge.type,
-            'type_data': {
-                'id': DockerServiceChallengeType.id,
-                'name': DockerServiceChallengeType.name,
-                'templates': DockerServiceChallengeType.templates,
-                'scripts': DockerServiceChallengeType.scripts,
-            }
-        }
-        return data
-
-    @staticmethod
-    def create(request):
+    @classmethod 
+    def create(cls, request):
         """
 		This method is used to process the challenge creation request.
 
@@ -108,16 +107,14 @@ class DockerServiceChallengeType(BaseChallenge):
 		:return:
 		"""
         data = request.form or request.get_json()
-        data['docker_secrets'] = data['docker_secrets_array']
-        data['docker_type'] = 'service'
-        del data['docker_secrets_array']
-        challenge = DockerServiceChallenge(**data)
+        data['docker_type'] = 'container'
+        challenge = DockerDynamicChallenge(**data)
         db.session.add(challenge)
         db.session.commit()
         return challenge
-
-    @staticmethod
-    def attempt(challenge, request):
+    
+    @classmethod
+    def attempt(cls, challenge, request):
         """
 		This method is used to check whether a given input is right or wrong. It does not make any changes and should
 		return a boolean for correctness and a string to be shown to the user. It is also in charge of parsing the
@@ -127,7 +124,6 @@ class DockerServiceChallengeType(BaseChallenge):
 		:param request: The request the user submitted
 		:return: (boolean, string)
 		"""
-
         data = request.form or request.get_json()
         print(request.get_json())
         print(data)
@@ -137,9 +133,9 @@ class DockerServiceChallengeType(BaseChallenge):
             if get_flag_class(flag.type).compare(flag, submission):
                 return True, "Correct"
         return False, "Incorrect"
-
-    @staticmethod
-    def solve(user, team, challenge, request):
+    
+    @classmethod
+    def solve(cls, user, team, challenge, request):
         """
 		This method is used to insert Solves into the database in order to mark a challenge as solved.
 
@@ -158,7 +154,7 @@ class DockerServiceChallengeType(BaseChallenge):
             else:
                 docker_containers = DockerChallengeTracker.query.filter_by(
                     docker_image=challenge.docker_image).filter_by(user_id=user.id).first()
-            delete_service(docker, docker_containers.instance_id)
+            delete_container(docker, docker_containers.instance_id)
             DockerChallengeTracker.query.filter_by(instance_id=docker_containers.instance_id).delete()
         except:
             pass
@@ -169,13 +165,12 @@ class DockerServiceChallengeType(BaseChallenge):
             ip=get_ip(req=request),
             provided=submission,
         )
+        cls.calculate_value(challenge)
         db.session.add(solve)
         db.session.commit()
-        # trying if this solces the detached instance error...
-        # db.session.close()
 
-    @staticmethod
-    def fail(user, team, challenge, request):
+    @classmethod
+    def fail(cls, user, team, challenge, request):
         """
 		This method is used to insert Fails into the database in order to mark an answer incorrect.
 
@@ -195,4 +190,22 @@ class DockerServiceChallengeType(BaseChallenge):
         )
         db.session.add(wrong)
         db.session.commit()
-        # db.session.close()            ip=get_ip(request), provided = submission,
+
+    @classmethod
+    def update(cls, challenge, request):
+        """
+        This method is used to update the information associated with a challenge. This should be kept strictly to the
+        Challenges table and any child tables.
+
+        :param challenge:
+        :param request:
+        :return:
+        """
+        data = request.form or request.get_json()
+
+        for attr, value in data.items():
+            # We need to set these to floats so that the next operations don't operate on strings
+            if attr in ("initial", "minimum", "decay"):
+                value = float(value)
+            setattr(challenge, attr, value)
+        return cls.calculate_value(challenge)

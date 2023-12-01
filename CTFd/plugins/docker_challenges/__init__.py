@@ -15,9 +15,10 @@ from .api import (active_docker_namespace, container_namespace,
                   docker_namespace, kill_container, secret_namespace)
 from .functions.general import get_repositories, get_docker_info, do_request
 from .models.container import DockerChallengeType
+from .models.dynamic import DockerDynamicChallengeType
+
 from .models.models import (DockerChallengeTracker, DockerConfig,
                             DockerConfigForm)
-from .models.service import DockerServiceChallengeType
 
 
 def __handle_file_upload(file_key, b_obj, attr_name):
@@ -140,7 +141,7 @@ def load(app):
     app.db.create_all()
 
     CHALLENGE_CLASSES['docker'] = DockerChallengeType
-    CHALLENGE_CLASSES['docker_service'] = DockerServiceChallengeType
+    CHALLENGE_CLASSES['docker_dynamic'] = DockerDynamicChallengeType
 
     register_plugin_assets_directory(app, base_path='/plugins/docker_challenges/assets')
 

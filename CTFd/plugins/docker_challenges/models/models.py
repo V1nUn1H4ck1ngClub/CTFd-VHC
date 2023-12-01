@@ -1,10 +1,10 @@
 from wtforms import (FileField, HiddenField, RadioField, SelectMultipleField,
                      StringField)
 
+from CTFd.plugins.challenges import BaseChallenge
 from CTFd.forms import BaseForm
 from CTFd.forms.fields import SubmitField
 from CTFd.models import Challenges, db
-
 
 class DockerConfig(db.Model):
     """
@@ -54,10 +54,16 @@ class DockerChallenge(Challenges):
     docker_type = db.Column(db.String(128), index=True)
     docker_image = db.Column(db.String(128), index=True)
 
-
-class DockerServiceChallenge(Challenges):
-    __mapper_args__ = {'polymorphic_identity': 'docker_service'}
-    id = db.Column(None, db.ForeignKey('challenges.id'), primary_key=True)
-    docker_type = db.Column(db.String(128), index=True)
+class DockerDynamicChallenge(Challenges):
+    __mapper_args__ = {'polymorphic_identity': 'docker_dynamic'}
+    id = db.Column(None, db.ForeignKey("challenges.id"), primary_key=True)
     docker_image = db.Column(db.String(128), index=True)
-    docker_secrets = db.Column(db.String(4096))
+    docker_type = db.Column(db.String(128), index=True)
+    initial = db.Column(db.Integer, default=0)
+    minimum = db.Column(db.Integer, default=0)
+    decay = db.Column(db.Integer, default=0)
+    function = db.Column(db.String(32), default="logarithmic")
+
+    def __init__(self, *args, **kwargs):
+        super(DockerDynamicChallenge, self).__init__(**kwargs)
+        self.value = kwargs["initial"]
